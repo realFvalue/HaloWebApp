@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Feed</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        input, button { padding: 5px; }
+        .post { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        .post button { margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        function App() {
+            const [posts, setPosts] = React.useState([]);
+            const [newPost, setNewPost] = React.useState({ content: '', author: '', categories: '' });
+            const [editingPost, setEditingPost] = React.useState(null);
+
+            React.useEffect(() => {
+                fetchPosts();
+            }, []);
+
+            const fetchPosts = async () => {
+                const response = await fetch('https://enginelabs-hcwfshj5.fly.dev/api/posts');
+                const data = await response.json();
+                setPosts(data);
+            };
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                if (editingPost) {
+                    setEditingPost({ ...editingPost, [name]: value });
+                } else {
+                    setNewPost({ ...newPost, [name]: value });
+                }
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (editingPost) {
+                    await updatePost(editingPost);
+                } else {
+                    await createPost();
+                }
+            };
+
+            const createPost = async () => {
+                const response = await fetch('https://enginelabs-hcwfshj5.fly.dev/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...newPost, categories: newPost.categories.split(',') }),
+                });
+                const data = await response.json();
+                setPosts([...posts, data]);
+                setNewPost({ content: '', author: '', categories: '' });
+            };
+
+            const updatePost = async (post) => {
+                const response = await fetch(`https://enginelabs-hcwfshj5.fly.dev/api/posts/${post.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...post, categories: post.categories.split(',') }),
+                });
+                const updatedPost = await response.json();
+                setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
+                setEditingPost(null);
+            };
+
+            const deletePost = async (id) => {
+                await fetch(`https://enginelabs-hcwfshj5.fly.dev/api/posts/${id}`, { method: 'DELETE' });
+                setPosts(posts.filter(post => post.id !== id));
+            };
+
+            return (
+                <div>
+                    <h1>Smart Feed</h1>
+                    <form onSubmit={handleSubmit}>
+                        <input
+                            type="text"
+                            name="content"
+                            value={editingPost ? editingPost.content : newPost.content}
+                            onChange={handleInputChange}
+                            placeholder="Post content"
+                            required
+                        />
+                        <input
+                            type="text"
+                            name="author"
+                            value={editingPost ? editingPost.author : newPost.author}
+                            onChange={handleInputChange}
+                            placeholder="Author"
+                            required
+                        />
+                        <input
+                            type="text"
+                            name="categories"
+                            value={editingPost ? editingPost.categories.join(',') : newPost.categories}
+                            onChange={handleInputChange}
+                            placeholder="Categories (comma-separated)"
+                            required
+                        />
+                        <button type="submit">{editingPost ? 'Update Post' : 'Create Post'}</button>
+                        {editingPost && <button onClick={() => setEditingPost(null)}>Cancel Edit</button>}
+                    </form>
+                    <h2>Posts</h2>
+                    {posts.map((post) => (
+                        <div key={post.id} className="post">
+                            <h3>{post.content}</h3>
+                            <p>Author: {post.author}</p>
+                            <p>Categories: {post.categories.join(', ')}</p>
+                            <p>AI Score: {post.aiScore}</p>
+                            <button onClick={() => setEditingPost(post)}>Edit</button>
+                            <button onClick={() => deletePost(post.id)}>Delete</button>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
